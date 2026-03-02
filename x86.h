@@ -5,6 +5,32 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+typedef struct {
+    uint64_t r15;
+    uint64_t r14;
+    uint64_t r13;
+    uint64_t r12;
+    uint64_t r11;
+    uint64_t r10;
+    uint64_t r9;
+    uint64_t r8;
+    uint64_t rdi;
+    uint64_t rsi;
+    uint64_t rbp;
+    uint64_t rbx;
+    uint64_t rdx;
+    uint64_t rcx;
+    uint64_t rax;
+
+    uint64_t intno;
+    uint64_t error_code;
+    uint64_t rip;
+    uint64_t cs;
+    uint64_t rflags;
+    uint64_t rsp;
+    uint64_t ss;
+} __attribute__((packed)) registers_t;
+
 //=================== PORT IO ====================
 inline uint8_t inb(uint16_t port) {
     uint8_t toret;
@@ -18,7 +44,7 @@ inline void outb(uint16_t port, uint8_t data) {
 
 inline uint16_t inw(uint16_t port) {
     uint16_t toret;
-    asm volatile("inw %1, %0": "=r"(toert): "r"(port));
+    asm volatile("inw %1, %0": "=r"(toret): "r"(port));
     return toret;
 }
 
@@ -34,6 +60,84 @@ inline uint32_t inl(uint16_t port) {
 
 inline void outl(uint16_t port, uint32_t data) {
 	asm volatile("outl %1, %0":: "r"(port), "r"(data));
+}
+
+//=================== MSR ===================
+
+#define MSR_IA32_EFER   0xC0000080
+#define MSR_IA32_STAR   0xC0000081
+#define MSR_IA32_LSTAR  0xC0000082
+#define MSR_IA32_CSTAR  0xC0000083
+#define MSR_IA32_SFMASK 0xC0000084
+#define MSR_IA32_FS_BASE 0xC0000100
+#define MSR_IA32_GS_BASE 0xC0000101
+#define MSR_IA32_KERNEL_GS_BASE 0xC0000102
+
+static inline void wrlsr(uint32_t msr, uint64_t value) {
+    uint32_t low = (uint32_t)value;
+    uint32_t high = (uint32_t)(value >> 32);
+    asm volatile("wrmsr":: "c"(msr), "a"(low), "d"(high));
+}
+
+// MSR read
+static inline uint64_t ArAMD64ReadMsr(uint32_t msr) {
+    uint32_t low, high;
+    asm volatile("rdmsr": "=a"(low), "=d"(high): "c"(msr));
+    return ((uint64_t)high << 32) | low;
+}
+
+
+//=================== CPU CONTROL ====================
+inline void sti(void) {
+    asm volatile("sti");
+}
+
+inline void cli(void) {
+    asm volatile("cli");
+}
+
+inline void hlt(void) {
+    asm volatile("hlt");
+}
+
+inline void jmp(void* addr) {
+    asm volatile("jmp *%0":: "r"(addr));
+}
+
+inline void lidt(void* idtr) {
+    asm volatile("lidt (%0)":: "r"(idtr));
+}
+
+inline void lgdt(void* gdtr) {
+    asm volatile(
+        "lgdt (%0)\n"
+        "pushq $0x08\n"
+        "lea 1f(%%rip), %%rax\n"
+        "pushq %%rax\n"
+        "lretq\n"
+        "1:\n"
+        "movw $0x10, %%ax\n"
+        "movw %%ax, %%ds\n"
+        "movw %%ax, %%es\n"
+        "movw %%ax, %%fs\n"
+        "movw %%ax, %%gs\n"
+        "movw %%ax, %%ss\n"
+        :
+        : "r"(gdtr)
+        : "rax"
+    );
+}
+
+inline void ltr(uint16_t tss_selector) {
+    asm volatile("ltr %0":: "r"(tss_selector));
+}
+
+inline void load_cr3(uint64_t cr3) {
+    asm volatile("mov %0, %%cr3":: "r"(cr3));
+}
+
+inline void invlpg(uint64_t addr) {
+    asm volatile("invlpg (%0)":: "r"(addr) : "memory");
 }
 
 
