@@ -5,33 +5,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-typedef struct {
-    uint64_t r15;
-    uint64_t r14;
-    uint64_t r13;
-    uint64_t r12;
-    uint64_t r11;
-    uint64_t r10;
-    uint64_t r9;
-    uint64_t r8;
-    uint64_t rdi;
-    uint64_t rsi;
-    uint64_t rbp;
-    uint64_t rbx;
-    uint64_t rdx;
-    uint64_t rcx;
-    uint64_t rax;
-
-    uint64_t intno;
-    uint64_t error_code;
-    uint64_t rip;
-    uint64_t cs;
-    uint64_t rflags;
-    uint64_t rsp;
-    uint64_t ss;
-} __attribute__((packed)) registers_t;
-
-//=================== PORT IO ====================
+//===================== PORT IO ======================
 inline uint8_t inb(uint16_t port) {
     uint8_t toret;
     asm volatile("inb %1, %0": "=r"(toret): "r"(port) );
@@ -62,7 +36,7 @@ inline void outl(uint16_t port, uint32_t data) {
 	asm volatile("outl %1, %0":: "r"(port), "r"(data));
 }
 
-//=================== MSR ===================
+//======================= MSR ========================
 
 #define MSR_IA32_EFER   0xC0000080
 #define MSR_IA32_STAR   0xC0000081
@@ -73,40 +47,51 @@ inline void outl(uint16_t port, uint32_t data) {
 #define MSR_IA32_GS_BASE 0xC0000101
 #define MSR_IA32_KERNEL_GS_BASE 0xC0000102
 
-static inline void wrlsr(uint32_t msr, uint64_t value) {
-    uint32_t low = (uint32_t)value;
-    uint32_t high = (uint32_t)(value >> 32);
-    asm volatile("wrmsr":: "c"(msr), "a"(low), "d"(high));
-}
-
-// MSR read
-static inline uint64_t ArAMD64ReadMsr(uint32_t msr) {
+static inline uint64_t rdmsr(uint32_t msr) {
     uint32_t low, high;
     asm volatile("rdmsr": "=a"(low), "=d"(high): "c"(msr));
     return ((uint64_t)high << 32) | low;
 }
 
-
-//=================== CPU CONTROL ====================
-inline void sti(void) {
-    asm volatile("sti");
+static inline void wrmsr(uint32_t msr, uint64_t value) {
+    uint32_t low = (uint32_t)value;
+    uint32_t high = (uint32_t)(value >> 32);
+    asm volatile("wrmsr":: "c"(msr), "a"(low), "d"(high));
 }
 
-inline void cli(void) {
-    asm volatile("cli");
-}
+//==================== INTERRUPTS ====================
 
-inline void hlt(void) {
-    asm volatile("hlt");
-}
+typedef struct {
+    uint64_t r15;
+    uint64_t r14;
+    uint64_t r13;
+    uint64_t r12;
+    uint64_t r11;
+    uint64_t r10;
+    uint64_t r9;
+    uint64_t r8;
+    uint64_t rdi;
+    uint64_t rsi;
+    uint64_t rbp;
+    uint64_t rbx;
+    uint64_t rdx;
+    uint64_t rcx;
+    uint64_t rax;
 
-inline void jmp(void* addr) {
-    asm volatile("jmp *%0":: "r"(addr));
-}
+    uint64_t intno;
+    uint64_t error_code;
+    uint64_t rip;
+    uint64_t cs;
+    uint64_t rflags;
+    uint64_t rsp;
+    uint64_t ss;
+} __attribute__((packed)) registers_t;
 
 inline void lidt(void* idtr) {
     asm volatile("lidt (%0)":: "r"(idtr));
 }
+
+//==================== SEGMENTATION ==================
 
 inline void lgdt(void* gdtr) {
     asm volatile(
@@ -132,6 +117,8 @@ inline void ltr(uint16_t tss_selector) {
     asm volatile("ltr %0":: "r"(tss_selector));
 }
 
+//=================== VIRTUAL MEMORY =================
+
 inline void load_cr3(uint64_t cr3) {
     asm volatile("mov %0, %%cr3":: "r"(cr3));
 }
@@ -140,5 +127,21 @@ inline void invlpg(uint64_t addr) {
     asm volatile("invlpg (%0)":: "r"(addr) : "memory");
 }
 
+//=================== CPU CONTROL ====================
+inline void sti(void) {
+    asm volatile("sti");
+}
+
+inline void cli(void) {
+    asm volatile("cli");
+}
+
+inline void hlt(void) {
+    asm volatile("hlt");
+}
+
+inline void jmp(void* addr) {
+    asm volatile("jmp *%0":: "r"(addr));
+}
 
 #endif // __X86_H
