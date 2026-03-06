@@ -6,34 +6,32 @@
 #include <stdbool.h>
 
 //===================== PORT IO ======================
-inline uint8_t inb(uint16_t port) {
-    uint8_t toret;
-    asm volatile("inb %1, %0": "=r"(toret): "r"(port) );
-    return toret;
+
+inline uint8_t inb(uint16_t addr){
+    uint8_t val = 0;
+    asm volatile("inb %1,%0" : "=a"(val) : "dN"(addr));
+    return val;
+}
+inline void outb(uint16_t addr, uint8_t val){
+    asm volatile("outb %0,%1" :: "a"(val),"dN"(addr));
 }
 
-inline void outb(uint16_t port, uint8_t data) {
-    asm volatile("outb %1, %0":: "r"(data), "r"(port) );
+inline uint16_t inw(uint16_t addr){
+    uint8_t val = 0;
+    asm volatile("inw %1,%0" : "=a"(val) : "dN"(addr));
+    return val;
+}
+inline void outw(uint16_t addr, uint16_t val){
+    asm volatile("outw %0,%1" :: "a"(val),"dN"(addr));
 }
 
-inline uint16_t inw(uint16_t port) {
-    uint16_t toret;
-    asm volatile("inw %1, %0": "=r"(toret): "r"(port));
-    return toret;
+inline uint32_t inl(uint16_t addr){
+    uint8_t val = 0;
+    asm volatile("inl %1,%0" : "=a"(val) : "dN"(addr));
+    return val;
 }
-
-inline void outw(uint16_t port, uint16_t data) {
-    asm volatile("outw %1, %0" :: "=r"(data), "r"(port));
-}
-
-inline uint32_t inl(uint16_t port) {
-	uint32_t toret;
-	asm volatile("inl %1, %0": "=r"(toret): "r"(port));
-	return toret;
-}
-
-inline void outl(uint16_t port, uint32_t data) {
-	asm volatile("outl %1, %0":: "r"(port), "r"(data));
+inline void outl(uint16_t addr, uint32_t val){
+    asm volatile("outw %0,%1" :: "a"(val),"dN"(addr));
 }
 
 //======================= MSR ========================
@@ -92,8 +90,26 @@ inline void lidt(void* idtr) {
 }
 
 //==================== SEGMENTATION ==================
+typedef uint64_t gdt_desc_t;
 
-inline void lgdt(void* gdtr) {
+typedef struct {
+    uint16_t size;
+    gdt_desc_t* address;
+} __attribute__((packed)) gdtr_t;
+
+#define GDT_CODE64 0x00af9b000000ffff
+#define GDT_DATA64 0x00af93000000ffff
+#define GDT_CODE64U 0x00aff3000000ffff
+#define GDT_DATA64U 0x00affb000000ffff
+
+//Offsets: 
+// * kernel code: 0x8
+// * kernel data: 0x10
+// * user   code: 0x18
+// * user   data: 0x20
+#define GDT_PREBAKED {0, GDT_CODE64, GDT_DATA64, GDT_CODE64U, GDT_DATA64U }
+
+inline void lgdt(gdtr_t* gdtr) {
     asm volatile(
         "lgdt (%0)\n"
         "pushq $0x08\n"
